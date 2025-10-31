@@ -8,7 +8,7 @@ class PolicyValueNetwork(nn.Module):
         self.action_size = action_size
         self.frame_length = frame_length
 
-        self.conv1 = nn.Conv2d(frame_length, 32, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(frame_length + 1, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
 

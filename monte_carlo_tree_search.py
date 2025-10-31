@@ -55,14 +55,14 @@ class MonteCarloTreeSearch:
         for _ in range(self.n_simulations):
             node = root
             tmp_game_history = self.game_history.copy()
-            print( "Starting new simulation")
+            # print( "Starting new simulation")
             while True:
                 state = tmp_game_history.get_state()
                 mask = 1 - (state[-1] + state[-2])
                 mask = mask.ravel().astype(np.bool_)
                 child_action = self.select(node, mask)
 
-                next_state, reward, done = self.env.simulate_move(state, child_action, player=to_play)
+                next_state, reward, done = self.env.step(child_action, state, to_play)
                 tmp_game_history.append(next_state)
                 next_obs = tmp_game_history.get_obs()
 
@@ -81,13 +81,13 @@ class MonteCarloTreeSearch:
         # Select the action with the highest UCB score.
         ucb_scores = node.ucb_score(c_puct=self.c_puct)
         ucb_scores[~mask] = -np.inf
-        print("invalid action:" , np.where(mask==0)[0])
+        # print("invalid action:" , np.where(mask==0)[0])
         max_score = np.max(ucb_scores)
         best_actions = np.where(ucb_scores == max_score)[0]
         child_action = np.random.choice(best_actions)
-        print("Selected action:", child_action)
-        if not mask[child_action]:
-            print("Warning: Selected an invalid action.")
+        # print("Selected action:", child_action)
+        # if not mask[child_action]:
+        #     print("Warning: Selected an invalid action.")
         return child_action
 
     def expand_and_evaluate(self, node, next_obs, child_action):
@@ -111,7 +111,7 @@ class MonteCarloTreeSearch:
         return
 
 
-def get_action_from_mcts(env, agent, game_history, n_simulations=100, c_puct=1.0, temperature=1.0):
+def get_action_from_mcts(env, agent, game_history, n_simulations=400, c_puct=1.0, temperature=1.0):
     # Get the best action and policy from MCTS search.
     mcts = MonteCarloTreeSearch(env, agent, game_history, n_simulations, c_puct)
     root = mcts.search()
