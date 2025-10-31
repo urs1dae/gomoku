@@ -7,7 +7,7 @@ class Node:
         # Initialize a node in the MCTS tree.
         self.obs = obs
         self.action = action
-        self.edges_prob = prior_prob[0].detach().numpy()
+        self.edges_prob = prior_prob[0].cpu().detach().numpy()
         self.edges_visit = np.zeros(prior_prob.shape[1], dtype=int)
         self.edges_value = np.zeros(prior_prob.shape[1], dtype=float)
 
@@ -48,7 +48,7 @@ class MonteCarloTreeSearch:
         # Run MCTS simulations from a given obs to build the search tree.
         obs = self.game_history.get_obs()
         prior_prob, obs_value = self.agent.predict(obs, add_noise=True)
-        
+
         root = Node(obs, action=None, prior_prob=prior_prob)
         to_play = self.env.current_player
 
@@ -109,6 +109,7 @@ class MonteCarloTreeSearch:
             node = node.parent
             value = -value
         return
+
 
 
 def get_action_from_mcts(env, agent, game_history, n_simulations=400, c_puct=1.0, temperature=1.0):

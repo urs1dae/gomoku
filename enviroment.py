@@ -12,7 +12,6 @@ class Player(IntEnum):
 
 class GomokuRenderer:
     def __init__(self, board_size: int = 15):
-        pygame.init()
 
         self.board_size = board_size
         self.SCREEN_WIDTH = 640
@@ -22,13 +21,12 @@ class GomokuRenderer:
         self.GRID_SIZE = 640
         self.interval = 40
         self.margin = 40
-        self.font = pygame.font.Font(None, 30)
         self.piece_radius = 15
-        
-        self.init_board()
 
     def init_board(self):
         """初始化 Pygame 窗口并绘制初始界面。"""
+        pygame.init()
+        self.font = pygame.font.Font(None, 30)
         self.screen = pygame.display.set_mode(self.screen_size)
         pygame.display.set_caption("Gomoku")
 
@@ -116,7 +114,10 @@ class GomokuEnv:
         self.action_size = board_size * board_size
 
         self.is_render = is_render
-        if self.is_render: self.renderer = GomokuRenderer(board_size)
+        self.renderer = GomokuRenderer(board_size)
+        
+        if self.is_render:
+            self.renderer.init_board()
 
     def reset(self):
         self.board = np.zeros((2, self.board_size, self.board_size), dtype=int)

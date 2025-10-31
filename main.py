@@ -1,19 +1,16 @@
 import swanlab
 import argparse
-import numpy as np
-from collections import deque
 
 from enviroment import GomokuEnv
 from agent import Agent
 from replay_buffer import ReplayBuffer
-from network import PolicyValueNetwork
 from monte_carlo_tree_search import get_action_from_mcts
 from utils import GameHistory
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument("--mode", type=str, default="train", choices=["train", "test"])
     parser.add_argument("--player_type", type=str, default='local', choices=['local', 'remote'])
     parser.add_argument("--framework", type=str, default='pytorch', choices=['pytorch', 'tensorflow', 'jax'])
@@ -26,8 +23,8 @@ def get_args():
 
 def train(args):
     swanlab.init()
-    win_counts = [0, 0]
-    
+    win_counts = [1, 1]
+
     env = GomokuEnv(board_size=15)
     agent = Agent(env, args, to_play=0)
     replay_buffer = ReplayBuffer(capacity=10_000_000)
@@ -43,7 +40,7 @@ def train(args):
         done = False
         while not done:
             obs = game_history.get_obs()
-            action, policy = get_action_from_mcts(env, agent, game_history, n_simulations=100)
+            action, policy = get_action_from_mcts(env, agent, game_history, n_simulations=200)
             next_state, reward, done = env.step(action)
 
             obs, mask = agent.prepare_agent_obs(obs)
@@ -67,8 +64,8 @@ def train(args):
                     obs, mask, policy = step
                     replay_buffer.push(obs, mask, policy, reward)
                     reward = -reward
-                swanlab.log({"black_vs_white_ratio": win_counts[0] / (win_counts[1] + 1e-8)})
-        
+                swanlab.log({"black_vs_white_ratio": win_counts[0] / (win_counts[1])})
+
         if episode % 100 == 0:
             agent.save_model()
 
