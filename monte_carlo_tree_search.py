@@ -1,14 +1,15 @@
+import torch
 import numpy as np
 
 
 class Node:
-    def __init__(self, state, action, prior_prob, parent=None):
+    def __init__(self, obs, action, prior_prob, parent=None):
         # Initialize a node in the MCTS tree.
-        self.state = state
+        self.obs = obs
         self.action = action
-        self.edges_prob = prior_prob
-        self.edges_visit = np.zeros(len(prior_prob), dtype=int)
-        self.edges_value = np.zeros(len(prior_prob), dtype=float)
+        self.edges_prob = prior_prob[0].detach().numpy()
+        self.edges_visit = np.zeros(prior_prob.shape[1], dtype=int)
+        self.edges_value = np.zeros(prior_prob.shape[1], dtype=float)
 
         self.parent = parent
         self.children = {}
@@ -35,23 +36,36 @@ class Node:
         return u
 
 class MonteCarloTreeSearch:
-    def __init__(self, env, agent, n_simulations, c_puct):
+    def __init__(self, env, agent, game_history, n_simulations, c_puct):
         # Initialize the Monte Carlo Tree Search.
         self.env = env
         self.agent = agent
+        self.game_history = game_history
         self.n_simulations = n_simulations
         self.c_puct = c_puct
 
-    def search(self, state):
-        # Run MCTS simulations from a given state to build the search tree.
-        prior_prob, state_value = self.agent.predict(state)
-        root = Node(state, action=None, prior_prob=prior_prob)
+    def search(self):
+        # Run MCTS simulations from a given obs to build the search tree.
+        obs = self.game_history.get_obs()
+        prior_prob, obs_value = self.agent.predict(obs, add_noise=True)
+        
+        root = Node(obs, action=None, prior_prob=prior_prob)
+        to_play = self.env.current_player
 
         for _ in range(self.n_simulations):
             node = root
+            tmp_game_history = self.game_history.copy()
+            print( "Starting new simulation")
             while True:
-                child_action = self.select(node)
-                next_state, reward, done = self.env.simulate_move(node.state, child_action)
+                state = tmp_game_history.get_state()
+                mask = 1 - (state[-1] + state[-2])
+                mask = mask.ravel().astype(np.bool_)
+                child_action = self.select(node, mask)
+
+                next_state, reward, done = self.env.simulate_move(state, child_action, player=to_play)
+                tmp_game_history.append(next_state)
+                next_obs = tmp_game_history.get_obs()
+
                 if done or node.children.get(child_action) is None:
                     break
                 node = node.children[child_action]
@@ -59,24 +73,31 @@ class MonteCarloTreeSearch:
             if done:
                 child_value = -reward
             else:
-                child_value = self.expand_and_evaluate(node, next_state, child_action)
+                child_value = self.expand_and_evaluate(node, next_obs, child_action)
             self.backup(node, child_action, child_value)
         return root
 
-    def select(self, node):
+    def select(self, node, mask):
         # Select the action with the highest UCB score.
         ucb_scores = node.ucb_score(c_puct=self.c_puct)
-        child_action = np.argmax(ucb_scores)
+        ucb_scores[~mask] = -np.inf
+        print("invalid action:" , np.where(mask==0)[0])
+        max_score = np.max(ucb_scores)
+        best_actions = np.where(ucb_scores == max_score)[0]
+        child_action = np.random.choice(best_actions)
+        print("Selected action:", child_action)
+        if not mask[child_action]:
+            print("Warning: Selected an invalid action.")
         return child_action
 
-    def expand_and_evaluate(self, node, next_state, child_action):
+    def expand_and_evaluate(self, node, next_obs, child_action):
         # Expand the tree with a new node and evaluate it.
-        child_prior_prob, child_state_value = self.agent.predict(next_state)
-        node.children[child_action] = Node(next_state, child_action, 
+        child_prior_prob, child_obs_value = self.agent.predict(next_obs)
+        node.children[child_action] = Node(next_obs, child_action, 
                                         prior_prob=child_prior_prob, 
                                         parent=node
                                         )
-        return child_state_value
+        return child_obs_value
 
     def backup(self, node, child_action, child_value):
         # Backpropagate the evaluation result up the tree.
@@ -90,10 +111,10 @@ class MonteCarloTreeSearch:
         return
 
 
-def get_action_from_mcts(state, env, agent, n_simulations=100, c_puct=1.0, temperature=1.0):
+def get_action_from_mcts(env, agent, game_history, n_simulations=100, c_puct=1.0, temperature=1.0):
     # Get the best action and policy from MCTS search.
-    mcts = MonteCarloTreeSearch(env, agent, n_simulations, c_puct)
-    root = mcts.search(state)
+    mcts = MonteCarloTreeSearch(env, agent, game_history, n_simulations, c_puct)
+    root = mcts.search()
     visit_counts = root.edges_visit
     action_size = len(visit_counts)
     if temperature == 0:
