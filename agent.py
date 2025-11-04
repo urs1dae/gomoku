@@ -15,12 +15,14 @@ class Agent:
         self.optimizer = torch.optim.AdamW(self.network.parameters(), lr=0.001, weight_decay=1e-4)
 
         if args.load_model:
-            self.load_model(self.path)
+            self.load_model()
 
     def load_model(self):
+        print("Loading model from", self.path)
         self.network.load_state_dict(torch.load(self.path))
 
     def save_model(self):
+        print("Saving model to", self.path)
         torch.save(self.network.state_dict(), self.path)
     
     def get_symmetrized_policy_value(self, raw_obs):

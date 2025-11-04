@@ -97,7 +97,7 @@ class GomokuRenderer:
         self.board_state[player, r, c] = 1
 
         self.current_turn += 1
-        self.current_player = player
+        self.current_player = 1 - player
         
         self._draw_full_board()
         
@@ -128,20 +128,25 @@ class GomokuEnv:
     def close(self):
         if self.is_render: self.renderer.close()
 
-    def step(self, action: tuple, board=None, current_player=None) -> tuple:
+    def step(self, action, board=None, player=None):
         x, y = action // self.board_size, action % self.board_size
+    
         if board is None:
             board = self.board
-        if current_player is None:
-            current_player = self.current_player
 
-            self.current_player = Player.WHITE if self.current_player == Player.BLACK else Player.BLACK
-            if self.is_render: self.renderer.update_board(x, y, current_player)
+        real_step = False
+        if player is None:
+            player = self.current_player
+            real_step = True
 
-        if board[current_player, x, y] + board[1 - current_player, x, y] != 0:
+        if board[player, x, y] + board[1 - player, x, y] != 0:
             raise ValueError("Invalid move")
-        board[current_player, x, y] = 1
-        reward, done = self.check_winner(board, current_player)
+        board[player, x, y] = 1
+        reward, done = self.check_winner(board, player)
+
+        if real_step:
+            if self.is_render: self.renderer.update_board(x, y, player)
+            self.current_player = 1 - player
 
         return (board, reward, done)
 
@@ -160,10 +165,11 @@ class GomokuEnv:
         conv_result = np.einsum('ijkl,kl->ij', windows, kernel)
         return conv_result
 
-    def check_winner(self, board=None, current_player=None):
-        player_board = board[current_player]
+    def check_winner(self, board=None, player=None):
+        player_board = board[player]
         for kernel in self.kernels:
             conv_result = self._convolve2d(player_board, kernel)
             if np.any(conv_result >= 5):
+                self.winner = player
                 return (1, True)
         return (0, False)
